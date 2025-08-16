@@ -46,28 +46,20 @@ function App() {
     if (recognitionRef.current) {
       try {
         recognitionRef.current.stop();
-      } catch (e) {
-        // Ignorar errores al detener
-      }
-      recognitionRef.current = null;
-    }
-    
-    // Verificar soporte del navegador
-    if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
-      try {
-        const SpeechRecognition = (window as any).webkitSpeechRecognition || (window as any).SpeechRecognition;
         recognitionRef.current = new SpeechRecognition();
         
         // Configurar opciones
         recognitionRef.current.continuous = true;
         recognitionRef.current.interimResults = true;
         
-        // Agregar manejo de errores para la creación del objeto
         if (!recognitionRef.current) {
           console.error('No se pudo crear el objeto de reconocimiento de voz');
           return;
         }
+        
       recognitionRef.current.lang = LANG;
+      recognitionRef.current.continuous = true;
+      recognitionRef.current.interimResults = true;
       recognitionRef.current.maxAlternatives = 1;
 
       recognitionRef.current.onresult = (event: any) => {
@@ -89,75 +81,46 @@ function App() {
           setTranscript(prev => prev + finalTranscript);
         }
         setInterimTranscript(interimTranscript);
-        
-        // Forzar actualización del DOM para evitar retrasos en la UI
-        requestAnimationFrame(() => {});
       };
 
       recognitionRef.current.onerror = (event: any) => {
         console.error('Error de reconocimiento:', event.error);
         
-        // Manejo mejorado de errores de reconocimiento
         if (isTranscribing) {
-          // Diferentes tiempos de espera según el tipo de error
-          let retryDelay = 1000; // Tiempo predeterminado
-          
-          if (event.error === 'network') {
-            console.log('Error de red detectado, reintentando con retraso progresivo...');
-            // Para errores de red, usamos un retraso más largo para dar tiempo a que se restablezca la conexión
-            retryDelay = 3000;
-          } else if (event.error === 'no-speech') {
-            retryDelay = 1500;
-          } else if (event.error === 'audio-capture') {
-            retryDelay = 2000;
-          }
-          
-          // Limpiar cualquier reinicio pendiente antes de programar uno nuevo
           if (restartTimeoutRef.current) {
             clearTimeout(restartTimeoutRef.current);
           }
           
-          restartTimeoutRef.current = setTimeout(() => {
+          restartTimeoutRef.current = window.setTimeout(() => {
             if (isTranscribing && recognitionRef.current) {
               try {
-                console.log(`Reintentando reconocimiento después de error: ${event.error}`);
                 recognitionRef.current.start();
               } catch (e) {
-                console.log('Error al reiniciar reconocimiento:', e);
+                console.error('Error al reiniciar reconocimiento:', e);
               }
             }
-          }, retryDelay);
+          }, 1000);
         }
       };
 
       recognitionRef.current.onend = () => {
-        console.log('Reconocimiento de voz finalizado');
-        // Reiniciar automáticamente si aún estamos transcribiendo
         if (isTranscribing) {
-          // Limpiar cualquier reinicio pendiente antes de programar uno nuevo
           if (restartTimeoutRef.current) {
             clearTimeout(restartTimeoutRef.current);
           }
           
-          // Reiniciar inmediatamente para evitar interrupciones en la transcripción
-          restartTimeoutRef.current = setTimeout(() => {
+          restartTimeoutRef.current = window.setTimeout(() => {
             if (recognitionRef.current && isTranscribing) {
               try {
-                console.log('Reiniciando reconocimiento después de finalización...');
                 recognitionRef.current.start();
               } catch (e) {
-                console.log('Error al reiniciar reconocimiento:', e);
+                console.error('Error al reiniciar reconocimiento:', e);
               }
             }
-          }, 100); // Reducimos el tiempo de espera para una transcripción más continua
+          }, 100);
         }
       };
 
-      recognitionRef.current.onstart = () => {
-        console.log('Reconocimiento de voz iniciado');
-      };
-      
-      console.log('Objeto de reconocimiento de voz inicializado correctamente');
       } catch (error) {
         console.error('Error al inicializar el reconocimiento de voz:', error);
         recognitionRef.current = null;
@@ -165,21 +128,6 @@ function App() {
     } else {
       console.warn('Este navegador no soporta reconocimiento de voz');
     }
-    
-    // Función de limpieza al desmontar el componente
-    return () => {
-      if (restartTimeoutRef.current) {
-        clearTimeout(restartTimeoutRef.current);
-      }
-      
-      if (recognitionRef.current) {
-        try {
-          recognitionRef.current.stop();
-        } catch (e) {
-          // Ignorar errores al detener
-        }
-      }
-    };
   }, [isTranscribing]);
 
   // Función mejorada para analizar frecuencias
@@ -410,167 +358,47 @@ function App() {
 
   // Iniciar transcripción mejorada con manejo de errores robusto
   const startTranscription = () => {
-    // Verificar si el navegador tiene soporte para reconocimiento de voz
     if (!('webkitSpeechRecognition' in window || 'SpeechRecognition' in window)) {
       alert('Tu navegador no soporta el reconocimiento de voz. Intenta con Chrome, Edge o Safari.');
       return;
     }
     
-    // Limpiar cualquier reinicio pendiente antes de iniciar
     if (restartTimeoutRef.current) {
       clearTimeout(restartTimeoutRef.current);
-      restartTimeoutRef.current = undefined;
     }
     
     setIsTranscribing(true);
     
     try {
-      // Detener cualquier reconocimiento previo
       if (recognitionRef.current) {
-        try {
-          recognitionRef.current.stop();
-        } catch (e) {
-          // Ignorar errores al detener
-        }
+        recognitionRef.current.start();
+      } else {
+        // Crear nuevo reconocimiento si no existe
+        const SpeechRecognition = (window as any).webkitSpeechRecognition || (window as any).SpeechRecognition;
+        recognitionRef.current = new SpeechRecognition();
+        recognitionRef.current.continuous = true;
+        recognitionRef.current.interimResults = true;
+        recognitionRef.current.lang = LANG;
+        recognitionRef.current.start();
       }
-      
-      // Crear un nuevo objeto de reconocimiento para evitar problemas de estado
-      const SpeechRecognition = (window as any).webkitSpeechRecognition || (window as any).SpeechRecognition;
-      recognitionRef.current = new SpeechRecognition();
-      
-      // Configurar opciones optimizadas para transcripción en tiempo real
-      recognitionRef.current.continuous = true;
-      recognitionRef.current.interimResults = true;
-      recognitionRef.current.maxAlternatives = 1;
-      recognitionRef.current.lang = LANG;
-      
-      // Configurar manejadores de eventos
-      recognitionRef.current.onresult = (event: any) => {
-        let finalTranscript = '';
-        let interimTranscript = '';
-
-        // Procesar todos los resultados disponibles
-        for (let i = event.resultIndex; i < event.results.length; i++) {
-          const transcriptPart = event.results[i][0].transcript;
-          if (event.results[i].isFinal) {
-            finalTranscript += transcriptPart + ' ';
-          } else {
-            interimTranscript += transcriptPart;
-          }
-        }
-
-        // Actualizar inmediatamente la transcripción
-        if (finalTranscript) {
-          setTranscript(prev => prev + finalTranscript);
-        }
-        setInterimTranscript(interimTranscript);
-        
-        // Forzar actualización del DOM para evitar retrasos en la UI
-        requestAnimationFrame(() => {});
-      };
-      
-      recognitionRef.current.onerror = (event: any) => {
-        console.error('Error de reconocimiento:', event.error);
-        
-        // Manejo mejorado de errores de reconocimiento
-        if (isTranscribing) {
-          // Diferentes tiempos de espera según el tipo de error
-          let retryDelay = 1000; // Tiempo predeterminado
-          
-          if (event.error === 'network') {
-            console.log('Error de red detectado, reintentando con retraso progresivo...');
-            // Para errores de red, usamos un retraso más largo para dar tiempo a que se restablezca la conexión
-            retryDelay = 3000;
-          } else if (event.error === 'no-speech') {
-            retryDelay = 1500;
-          } else if (event.error === 'audio-capture') {
-            retryDelay = 2000;
-          }
-          
-          // Limpiar cualquier reinicio pendiente antes de programar uno nuevo
-          if (restartTimeoutRef.current) {
-            clearTimeout(restartTimeoutRef.current);
-          }
-          
-          restartTimeoutRef.current = setTimeout(() => {
-            if (isTranscribing && recognitionRef.current) {
-              try {
-                console.log(`Reintentando reconocimiento después de error: ${event.error}`);
-                recognitionRef.current.start();
-              } catch (e) {
-                console.log('Error al reiniciar reconocimiento:', e);
-              }
-            }
-          }, retryDelay);
-        }
-      };
-      
-      recognitionRef.current.onend = () => {
-        console.log('Reconocimiento de voz finalizado');
-        // Reiniciar automáticamente si aún estamos transcribiendo
-        if (isTranscribing) {
-          // Limpiar cualquier reinicio pendiente antes de programar uno nuevo
-          if (restartTimeoutRef.current) {
-            clearTimeout(restartTimeoutRef.current);
-          }
-          
-          // Reiniciar inmediatamente para evitar interrupciones en la transcripción
-          restartTimeoutRef.current = setTimeout(() => {
-            if (recognitionRef.current && isTranscribing) {
-              try {
-                console.log('Reiniciando reconocimiento después de finalización...');
-                recognitionRef.current.start();
-              } catch (e) {
-                console.log('Error al reiniciar reconocimiento:', e);
-              }
-            }
-          }, 100); // Reducimos el tiempo de espera para una transcripción más continua
-        }
-      };
-      
-      // Iniciar el reconocimiento
-      recognitionRef.current.start();
-      console.log('Reconocimiento iniciado correctamente');
-      
     } catch (error) {
       console.error('Error al iniciar reconocimiento:', error);
-      
-      // Intentar recuperarse del error
-      setTimeout(() => {
-        try {
-          // Intentar crear un nuevo objeto de reconocimiento
-          const SpeechRecognition = (window as any).webkitSpeechRecognition || (window as any).SpeechRecognition;
-          recognitionRef.current = new SpeechRecognition();
-          recognitionRef.current.continuous = true;
-          recognitionRef.current.interimResults = true;
-          recognitionRef.current.lang = LANG;
-          recognitionRef.current.start();
-          console.log('Reconocimiento recuperado después de error');
-        } catch (retryError) {
-          console.error('No se pudo recuperar del error de reconocimiento:', retryError);
-          setIsTranscribing(false);
-          alert('No se pudo iniciar el reconocimiento de voz. Por favor, recarga la página e intenta de nuevo.');
-        }
-      }, 500);
+      setIsTranscribing(false);
+      alert('No se pudo iniciar el reconocimiento de voz. Por favor, recarga la página e intenta de nuevo.');
     }
   };
 
   // Detener transcripción con limpieza completa
   const stopTranscription = () => {
-    console.log('Deteniendo transcripción...');
     setIsTranscribing(false);
     
-    // Limpiar todos los timeouts pendientes
     if (restartTimeoutRef.current) {
       clearTimeout(restartTimeoutRef.current);
-      restartTimeoutRef.current = undefined;
     }
     
-    // Detener el reconocimiento actual
     if (recognitionRef.current) {
       try {
         recognitionRef.current.stop();
-        console.log('Reconocimiento detenido correctamente');
       } catch (error) {
         console.error('Error al detener reconocimiento:', error);
       }

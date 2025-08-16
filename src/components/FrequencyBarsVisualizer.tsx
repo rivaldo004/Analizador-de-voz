@@ -7,6 +7,7 @@ const FrequencyBarsVisualizer: React.FC = () => {
   const [voiceActive, setVoiceActive] = useState(false);
   const [voiceIntensity, setVoiceIntensity] = useState<'normal' | 'medium' | 'high'>('normal');
   const [showHelp, setShowHelp] = useState(false);
+  const [streamRef, setStreamRef] = useState<MediaStream | null>(null);
   const audioContextRef = useRef<AudioContext | null>(null);
   const analyserRef = useRef<AnalyserNode | null>(null);
   const microphoneRef = useRef<MediaStreamAudioSourceNode | null>(null);
@@ -49,6 +50,7 @@ const FrequencyBarsVisualizer: React.FC = () => {
     const startAnalyzing = async () => {
       try {
         const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        setStreamRef(stream);
         const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
         const analyser = audioContext.createAnalyser();
         analyser.fftSize = 2048;
@@ -138,6 +140,7 @@ const FrequencyBarsVisualizer: React.FC = () => {
         visualize();
       } catch (error) {
         console.error('Error accessing microphone:', error);
+        alert('Error al acceder al micrófono. Por favor, permite el acceso al micrófono.');
         setIsAnalyzing(false);
       }
     };
@@ -145,6 +148,10 @@ const FrequencyBarsVisualizer: React.FC = () => {
     startAnalyzing();
 
     return () => {
+      // Cleanup stream
+      if (streamRef) {
+        streamRef.getTracks().forEach(track => track.stop());
+      }
       if (animationFrameIdRef.current) {
         cancelAnimationFrame(animationFrameIdRef.current);
         animationFrameIdRef.current = null;

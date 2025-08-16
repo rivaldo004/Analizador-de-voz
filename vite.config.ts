@@ -9,9 +9,19 @@ export default defineConfig({
   },
   server: {
     host: true,
-    open: true
+    open: true,
+    port: 3000
   },
-  define: {
-    __LANG__: JSON.stringify('es-ES')
+  build: {
+    outDir: 'dist',
+    sourcemap: true,
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          vendor: ['react', 'react-dom'],
+          icons: ['lucide-react']
+        }
+      }
+    }
   }
 });

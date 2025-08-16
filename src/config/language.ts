@@ -1,6 +1,6 @@
 // Configuración de idioma para la aplicación
 
-export const LANG = __LANG__ || 'es-ES';
+export const LANG = 'es-ES';
 
 export const translations = {
   'es-ES': {
@@ -145,10 +145,13 @@ export const translations = {
     voiceIntensity: 'Intensidad de voz',
     startAnalysis: 'Iniciar Análisis',
     stopAnalysis: 'Detener Análisis',
+    
+    // Nuevas traducciones faltantes
+    inactive: 'Inactivo',
   },
 };
 
 // Función para obtener traducciones
 export const t = (key: keyof typeof translations['es-ES']) => {
-  return translations[LANG as keyof typeof translations]?.[key] || key;
+  return translations['es-ES'][key] || key;
 };
